@@ -1,4 +1,4 @@
-# Packet Sniffer
+# Network Packet Analyzer
 
 This project is a packet sniffer that allows you to capture and analyze network packets based on user-defined protocols such as TCP, UDP, ICMP, and IP. It uses the Python library `Scapy` to capture packets and display useful information about them such as source/destination IP addresses, source/destination ports, and raw payloads.
 
