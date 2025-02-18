@@ -1,87 +1,94 @@
-import tkinter as tk
-from tkinter import scrolledtext
-from scapy.all import sniff, IP, TCP, UDP, Ether
-import threading
+from scapy.all import *
+from scapy.layers.inet import IP, TCP, UDP, ICMP
 
-class PacketSnifferApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Network Packet Analyzer")
-        self.root.geometry("800x600")
+def packet_analysis(packet, protocol_choice):
+    if packet.haslayer(IP):
+        source_ip = packet[IP].src
+        destination_ip = packet[IP].dst
+        protocol = packet[IP].proto
 
-        # Create a text area to display packet information
-        self.packet_info_area = scrolledtext.ScrolledText(root, wrap=tk.WORD, width=100, height=30)
-        self.packet_info_area.pack(padx=10, pady=10)
+        if protocol_choice == "TCP" and packet.haslayer(TCP):
+            print("TCP Packet detected")
+            print(f"Source IP: {source_ip}")
+            print(f"Destination IP: {destination_ip}")
+            print(f"Source Port: {packet[TCP].sport}")
+            print(f"Destination Port: {packet[TCP].dport}")
+            if packet.haslayer(Raw):
+                payload = packet[Raw].load
+                print(f"Payload: {payload}")
+            print("--------------------------------")
 
-        # Start button
-        self.start_button = tk.Button(root, text="Start Sniffing", command=self.start_sniffing)
-        self.start_button.pack(pady=5)
+        elif protocol_choice == "UDP" and packet.haslayer(UDP):
+            print("UDP Packet detected")
+            print(f"Source IP: {source_ip}")
+            print(f"Destination IP: {destination_ip}")
+            print(f"Source Port: {packet[UDP].sport}")
+            print(f"Destination Port: {packet[UDP].dport}")
+            if packet.haslayer(Raw):
+                payload = packet[Raw].load
+                print(f"Payload: {payload}")
+            print("--------------------------------")
 
-        # Stop button
-        self.stop_button = tk.Button(root, text="Stop Sniffing", command=self.stop_sniffing, state=tk.DISABLED)
-        self.stop_button.pack(pady=5)
+        elif protocol_choice == "ICMP" and packet.haslayer(ICMP):
+            print("ICMP Packet detected")
+            print(f"Source IP: {source_ip}")
+            print(f"Destination IP: {destination_ip}")
+            if packet.haslayer(Raw):
+                payload = packet[Raw].load
+                print(f"Payload: {payload}")
+            print("--------------------------------")
 
-        # Flag to control the sniffing process
-        self.sniffing = False
+        elif protocol_choice == "IP" and packet.haslayer(IP):
+            print("IP Packet detected")
+            print(f"Source IP: {source_ip}")
+            print(f"Destination IP: {destination_ip}")
+            if packet.haslayer(Raw):
+                payload = packet[Raw].load
+                print(f"Payload: {payload}")
+            print("--------------------------------")
 
-    def start_sniffing(self):
-        self.sniffing = True
-        self.start_button.config(state=tk.DISABLED)
-        self.stop_button.config(state=tk.NORMAL)
-        self.packet_info_area.delete(1.0, tk.END)
-        self.packet_info_area.insert(tk.END, "Starting packet capture...\n")
+def start_sniffing(protocol_choice):
+    filter_expr = ""
 
-        # Start sniffing in a separate thread to keep the GUI responsive
-        self.sniff_thread = threading.Thread(target=self.sniff_packets)
-        self.sniff_thread.start()
+    # Define the filter expression based on protocol choice
+    if protocol_choice == "TCP":
+        filter_expr = "tcp"
+    elif protocol_choice == "UDP":
+        filter_expr = "udp"
+    elif protocol_choice == "ICMP":
+        filter_expr = "icmp"
+    elif protocol_choice == "IP":
+        filter_expr = "ip"
 
-    def stop_sniffing(self):
-        self.sniffing = False
-        self.start_button.config(state=tk.NORMAL)
-        self.stop_button.config(state=tk.DISABLED)
-        self.packet_info_area.insert(tk.END, "Packet capture stopped.\n")
+    print(f"Starting packet sniffing for {protocol_choice} protocol...")
+    sniff(filter=filter_expr, prn=lambda packet: packet_analysis(packet, protocol_choice))
 
-    def sniff_packets(self):
-        # Sniff packets and call process_packet for each packet
-        sniff(prn=self.process_packet, stop_filter=lambda x: not self.sniffing)
+def choose_protocol():
+    print("Select the protocol you want to sniff:")
+    print("1. TCP")
+    print("2. UDP")
+    print("3. ICMP")
+    print("4. IP")
 
-    def process_packet(self, packet):
-        # Extract relevant information from the packet
-        if Ether in packet:
-            eth_src = packet[Ether].src
-            eth_dst = packet[Ether].dst
-            eth_type = packet[Ether].type
-            packet_info = f"Ethernet Frame: {eth_src} -> {eth_dst}, Type: {eth_type}\n"
-            self.packet_info_area.insert(tk.END, packet_info)
+    choice = input("Enter the number corresponding to the protocol: ")
 
-        if IP in packet:
-            ip_src = packet[IP].src
-            ip_dst = packet[IP].dst
-            ip_proto = packet[IP].proto
-            packet_info = f"IP Packet: {ip_src} -> {ip_dst}, Protocol: {ip_proto}\n"
-            self.packet_info_area.insert(tk.END, packet_info)
+    if choice == "1":
+        return "TCP"
+    elif choice == "2":
+        return "UDP"
+    elif choice == "3":
+        return "ICMP"
+    elif choice == "4":
+        return "IP"
+    else:
+        print("Invalid choice. Defaulting to IP.")
+        return "IP"
 
-        if TCP in packet:
-            tcp_sport = packet[TCP].sport
-            tcp_dport = packet[TCP].dport
-            packet_info = f"TCP Segment: {ip_src}:{tcp_sport} -> {ip_dst}:{tcp_dport}\n"
-            self.packet_info_area.insert(tk.END, packet_info)
+# Main function to interactively choose the protocol
+def main():
+    protocol_choice = choose_protocol()
+    start_sniffing(protocol_choice)
 
-        if UDP in packet:
-            udp_sport = packet[UDP].sport
-            udp_dport = packet[UDP].dport
-            packet_info = f"UDP Datagram: {ip_src}:{udp_sport} -> {ip_dst}:{udp_dport}\n"
-            self.packet_info_area.insert(tk.END, packet_info)
-
-        if packet.haslayer(Raw):
-            payload = packet[Raw].load
-            packet_info = f"Payload: {payload}\n"
-            self.packet_info_area.insert(tk.END, packet_info)
-
-        self.packet_info_area.insert(tk.END, "-" * 80 + "\n")
-        self.packet_info_area.see(tk.END)
-
+# Run the program
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = PacketSnifferApp(root)
-    root.mainloop()
+    main()
